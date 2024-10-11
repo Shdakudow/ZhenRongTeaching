@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>數位學伴-三角形的檢驗</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+        }
+        canvas {
+            border: 2px solid #555;
+            background-color: #ffffff;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .info-panel {
+            margin-left: 20px;
+            padding: 10px;
+            border: 2px solid #555;
+            background-color: #fff;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .length-label {
+            font-size: 16px;
+            color: #000;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .triangle-status {
+            margin-top: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .triangle-yes {
+            color: red; /* 當三角形成立時變成紅色 */
+        }
+        h1 {
+            margin-bottom: 20px;
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>數位學伴 - 三角形的檢驗</h1>
+<canvas id="triangleCanvas" width="600" height="400"></canvas>
+<div class="info-panel">
+    <div class="length-label">邊1: <span id="length1">0</span> cm</div>
+    <div class="length-label">邊2: <span id="length2">0</span> cm</div>
+    <div class="length-label">邊3: <span id="length3">0</span> cm</div>
+    <div class="triangle-status">是否為三角形: <span id="status">否</span></div>
+</div>
+
+<script>
+const canvas = document.getElementById("triangleCanvas");
+const ctx = canvas.getContext("2d");
+
+const lengthDisplay1 = document.getElementById("length1");
+const lengthDisplay2 = document.getElementById("length2");
+const lengthDisplay3 = document.getElementById("length3");
+const statusDisplay = document.getElementById("status");
+
+const snapDistance = 20; // 自動校正的距離閾值
+let draggingPoint = null;
+
+const pixelToCm = 0.1;  // 假設1px 等於 0.1 公分
+const minLengthCm = 1;  // 最小長度1 cm
+const maxLengthCm = 30; // 最大長度30 cm
+const minLengthPx = minLengthCm / pixelToCm;  // 轉換成px
+const maxLengthPx = maxLengthCm / pixelToCm;  // 轉換成px
+
+const lines = [
+    { x1: 100, y1: 100, x2: 200, y2: 100 }, // 線段1
+    { x1: 300, y1: 200, x2: 400, y2: 200 }, // 線段2
+    { x1: 150, y1: 300, x2: 250, y2: 300 }  // 線段3
+];
+
+// 計算線段長度，並確保長度是整數，單位是cm
+function lineLength(line) {
+    const lengthPx = Math.sqrt(Math.pow(line.x2 - line.x1, 2) + Math.pow(line.y2 - line.y1, 2));
+    return Math.round(lengthPx * pixelToCm);  // 將px轉換為cm
+}
+
+// 檢查是否滿足三角形條件
+function checkTriangleCondition() {
+    const length1 = lineLength(lines[0]);
+    const length2 = lineLength(lines[1]);
+    const length3 = lineLength(lines[2]);
+
+    const isValidTriangle = (length1 + length2 > length3) &&
+                            (length1 + length3 > length2) &&
+                            (length2 + length3 > length1);
+
+    // 更新顯示
+    lengthDisplay1.textContent = length1;
+    lengthDisplay2.textContent = length2;
+    lengthDisplay3.textContent = length3;
+    statusDisplay.textContent = isValidTriangle ? "是" : "否";
+    statusDisplay.className = isValidTriangle ? "triangle-yes" : ""; // 根據是否為三角形更新顏色
+}
+
+// 繪製線段和顯示長度
+function drawLines() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    lines.forEach(line => {
+        const length = lineLength(line);
+        const midX = (line.x1 + line.x2) / 2;
+        const midY = (line.y1 + line.y2) / 2;
+
+        // 加入線條漸變效果
+        const gradient = ctx.createLinearGradient(line.x1, line.y1, line.x2, line.y2);
+        gradient.addColorStop(0, '#ff6363');
+        gradient.addColorStop(1, '#63ff63');
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(line.x1, line.y1);
+        ctx.lineTo(line.x2, line.y2);
+        ctx.stroke();
+
+        // 顯示長度
+        ctx.fillStyle = '#000';
+        ctx.font = '16px Arial';
+        ctx.fillText(`${length} cm`, midX, midY);
+    });
+    checkTriangleCondition(); // 每次繪製時檢查三角形條件
+}
+
+// 檢測點是否在某個線段的端點上
+function getDragPoint(x, y) {
+    for (let line of lines) {
+        if (Math.abs(line.x1 - x) < 10 && Math.abs(line.y1 - y) < 10) return { line, point: 'start' };
+        if (Math.abs(line.x2 - x) < 10 && Math.abs(line.y2 - y) < 10) return { line, point: 'end' };
+    }
+    return null;
+}
+
+// 自動校正
+function snapToPoint(line, point) {
+    lines.forEach(otherLine => {
+        if (line !== otherLine) {
+            if (Math.abs(otherLine.x1 - line[point + 'X']) < snapDistance && Math.abs(otherLine.y1 - line[point + 'Y']) < snapDistance) {
+                line[point + 'X'] = otherLine.x1;
+                line[point + 'Y'] = otherLine.y1;
+            }
+            if (Math.abs(otherLine.x2 - line[point + 'X']) < snapDistance && Math.abs(otherLine.y2 - line[point + 'Y']) < snapDistance) {
+                line[point + 'X'] = otherLine.x2;
+                line[point + 'Y'] = otherLine.y2;
+            }
+        }
+    });
+}
+
+// 拖動開始
+canvas.addEventListener("mousedown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    draggingPoint = getDragPoint(x, y);
+});
+
+// 拖動過程
+canvas.addEventListener("mousemove", (e) => {
+    if (draggingPoint) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (draggingPoint.point === 'start') {
+            draggingPoint.line.x1 = Math.round(x);  // 保證坐標變動為整數
+            draggingPoint.line.y1 = Math.round(y);
+        } else {
+            draggingPoint.line.x2 = Math.round(x);
+            draggingPoint.line.y2 = Math.round(y);
+        }
+
+        // 保持線段長度在 1 到 30 cm 之間
+        let lengthPx = Math.sqrt(Math.pow(draggingPoint.line.x2 - draggingPoint.line.x1, 2) + Math.pow(draggingPoint.line.y2 - draggingPoint.line.y1, 2));
+        if (lengthPx < minLengthPx) {
+            lengthPx = minLengthPx;
+        } else if (lengthPx > maxLengthPx) {
+            lengthPx = maxLengthPx;
+        }
+
+        // 根據長度調整位置
+        const angle = Math.atan2(draggingPoint.line.y2 - draggingPoint.line.y1, draggingPoint.line.x2 - draggingPoint.line.x1);
+        draggingPoint.line.x2 = draggingPoint.line.x1 + Math.cos(angle) * lengthPx;
+        draggingPoint.line.y2 = draggingPoint.line.y1 + Math.sin(angle)
+        draggingPoint.line.y2 = draggingPoint.line.y1 + Math.sin(angle) * lengthPx;
+
+        // 自動校正
+        snapToPoint(draggingPoint.line, draggingPoint.point === 'start' ? 'x1' : 'x2');
+        drawLines();
+    }
+});
+
+// 拖動結束
+canvas.addEventListener("mouseup", () => {
+    draggingPoint = null;
+});
+
+// 初始繪製
+drawLines();
+</script>
+
+</body>
+</html>
